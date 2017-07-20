@@ -1,15 +1,6 @@
 from flask import jsonify
 from flask import render_template
 
-from middleware import candidate_by_id
-from middleware import candidate
-from middleware import add_candidate
-from middleware import candidate_update_name
-from middleware import random_candidates
-from middleware import delete_candidate
-from middleware import random_projects
-from middleware import add_project
-
 from middleware import cloud
 from middleware import add_cloud
 from middleware import cloud_by_id
@@ -38,78 +29,69 @@ from middleware import machinetestresult_by_id
 from middleware import machinetestresult_update_status
 from middleware import delete_machinetestresult
 
+from middleware import initialize_database as init_db
+from middleware import build_message
+
 
 def init_api_routes(app):
     if app:
-        # app.add_url_rule('/api/candidate/<string:id>', 'candidate_by_id', candidate_by_id, methods=['GET'])
-        # app.add_url_rule('/api/candidate', 'candidate', candidate, methods=['GET'])
-        # app.add_url_rule('/api/candidate', 'add_candidate', add_candidate, methods=['POST'])
-        # app.add_url_rule('/api/candidate/<string:id>/name/<string:new_name>', 'candidate_update_name',
-        #                  candidate_update_name, methods=['PUT'])
-        # app.add_url_rule('/api/candidate/random', 'get_one_random_candidate', random_candidates,
-        #                  methods=['GET'], defaults={'nr_of_items': 1})
-        # app.add_url_rule('/api/candidate/random/<int:nr_of_items>', 'get_random_candidates', random_candidates,
-        #                  methods=['GET'])
-        # app.add_url_rule('/api/candidate/delete/<string:id>', 'delete_candidate', delete_candidate, methods=['DELETE'])
-        # app.add_url_rule('/api/project/random/<int:nr_of_items>', 'get_random_projects', random_projects,
-        #                  methods=['GET'])
-        # app.add_url_rule('/api/project', 'add_project', add_project, methods=['POST'])
-        app.add_url_rule('/api/cloud', 'cloud', cloud, methods=['GET'])
-        app.add_url_rule('/api/cloud/<string:id>', 'cloud_by_id', cloud_by_id,
+        app.add_url_rule('/api/clouds', 'cloud', cloud, methods=['GET'])
+        app.add_url_rule('/api/clouds/<string:id>', 'cloud_by_id', cloud_by_id,
                           methods=['GET'])
-        app.add_url_rule('/api/cloud/<string:id>/ossupport', 'ossupports_by_cloudid',
+        app.add_url_rule('/api/clouds/<string:id>/ossupports', 'ossupports_by_cloudid',
                         ossupports_by_cloudid, methods=['GET'])
-        app.add_url_rule('/api/cloud/<string:id>/machine', 'machines_by_cloudid',
+        app.add_url_rule('/api/clouds/<string:id>/machines', 'machines_by_cloudid',
                         machines_by_cloudid, methods=['GET'])
-        app.add_url_rule('/api/cloud','add_cloud',add_cloud,methods=['POST'])
+        app.add_url_rule('/api/clouds','add_cloud',add_cloud,methods=['POST'])
 
-        app.add_url_rule('/api/ossupport', 'ossupport', ossupport, methods=['GET'])
-        app.add_url_rule('/api/ossupport/<string:id>', 'ossupport_by_id', ossupport_by_id,
+        app.add_url_rule('/api/ossupports', 'ossupport', ossupport, methods=['GET'])
+        app.add_url_rule('/api/ossupports/<string:id>', 'ossupport_by_id', ossupport_by_id,
                           methods=['GET'])
-        app.add_url_rule('/api/ossupport','add_ossupport',add_ossupport,methods=['POST'])
+        app.add_url_rule('/api/ossupports','add_ossupport',add_ossupport,methods=['POST'])
 
-        app.add_url_rule('/api/test', 'test', test, methods=['GET'])
-        app.add_url_rule('/api/test/<string:id>', 'test_by_id', test_by_id,
+        app.add_url_rule('/api/tests', 'test', test, methods=['GET'])
+        app.add_url_rule('/api/tests/<string:id>', 'test_by_id', test_by_id,
                           methods=['GET'])
-        app.add_url_rule('/api/test','add_test',add_test,methods=['POST'])
+        app.add_url_rule('/api/tests','add_test',add_test,methods=['POST'])
 
-        app.add_url_rule('/api/machine', 'machine', machine, methods=['GET'])
-        app.add_url_rule('/api/machine/<string:id>', 'machine_by_id', machine_by_id,
+        app.add_url_rule('/api/machines', 'machine', machine, methods=['GET'])
+        app.add_url_rule('/api/machines/<string:id>', 'machine_by_id', machine_by_id,
                           methods=['GET'])
-        app.add_url_rule('/api/machine/<string:id>/machinetestresult',
+        app.add_url_rule('/api/machines/<string:id>/machinetestresults',
                         'machinetestresults_by_machineid', machinetestresults_by_machineid,
                         methods=['GET'])
-        app.add_url_rule('/api/machine/<string:id>/machinedetail',
+        app.add_url_rule('/api/machines/<string:id>/machinedetails',
                         'machinedetails_by_machineid', machinedetails_by_machineid,
                         methods=['GET'])
-        app.add_url_rule('/api/machine','add_machine',add_machine,methods=['POST'])
+        app.add_url_rule('/api/machines','add_machine',add_machine,methods=['POST'])
 
-        app.add_url_rule('/api/machineattribute', 'machineattribute', machineattribute,
+        app.add_url_rule('/api/machineattributes', 'machineattribute', machineattribute,
                         methods=['GET'])
-        app.add_url_rule('/api/machineattribute/<string:id>', 'machineattribute_by_id',
+        app.add_url_rule('/api/machineattributes/<string:id>', 'machineattribute_by_id',
                         machineattribute_by_id,methods=['GET'])
-        app.add_url_rule('/api/machineattribute','add_machineattribute',
+        app.add_url_rule('/api/machineattributes','add_machineattribute',
                         add_machineattribute,methods=['POST'])
 
-        app.add_url_rule('/api/machinedetail', 'machinedetail', machinedetail,
+        app.add_url_rule('/api/machinedetails', 'machinedetail', machinedetail,
                         methods=['GET'])
-        app.add_url_rule('/api/machinedetail/<string:id>', 'machinedetail_by_id',
+        app.add_url_rule('/api/machinedetails/<string:id>', 'machinedetail_by_id',
                         machinedetail_by_id,methods=['GET'])
-        app.add_url_rule('/api/machinedetail','add_machinedetail',
+        app.add_url_rule('/api/machinedetails','add_machinedetail',
                         add_machinedetail,methods=['POST'])
 
-        app.add_url_rule('/api/machinetestresult', 'machinetestresult', machinetestresult,
+        app.add_url_rule('/api/machinetestresults', 'machinetestresult', machinetestresult,
                         methods=['GET'])
-        app.add_url_rule('/api/machinetestresult/<string:id>', 'machinetestresult_by_id',
+        app.add_url_rule('/api/machinetestresults/<string:id>', 'machinetestresult_by_id',
                         machinetestresult_by_id,methods=['GET'])
-        app.add_url_rule('/api/machinetestresult','add_machinetestresult',
+        app.add_url_rule('/api/machinetestresults','add_machinetestresult',
                         add_machinetestresult,methods=['POST'])
-        app.add_url_rule('/api/machinetestresult/<string:id>/status/<string:new_status>',
+        app.add_url_rule('/api/machinetestresults/<string:id>/status/<string:new_status>',
                         'machinetestresult_update_status', machinetestresult_update_status,
                         methods=['PUT'])
-        app.add_url_rule('/api/machinetestresult/delete/<string:id>',
+        app.add_url_rule('/api/machinetestresults/delete/<string:id>',
                         'delete_machinetestresult', delete_machinetestresult, methods=['DELETE'])
 
+        app.add_url_rule('/api/initdb', 'initdb', initialize_database)
         app.add_url_rule('/api', 'list_routes', list_routes, methods=['GET'],
                         defaults={'app': app})
 
@@ -151,3 +133,12 @@ def list_routes(app):
             'route': str(rt)
         })
     return jsonify({'routes': result, 'total': len(result)})
+
+def initialize_database():
+    message_key = "Initialize Database"
+    try:
+        init_db()
+    except ValueError as err:
+        return jsonify(build_message(message_key, err.message))
+
+    return jsonify(build_message(message_key, "OK"))

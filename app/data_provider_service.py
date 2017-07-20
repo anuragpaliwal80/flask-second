@@ -1,255 +1,324 @@
-from clouddatagenerator import CloudDataGenerator
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 
-from cloud import Cloud
-from ossupport import OSSupport
-from test import Test
-from machine import Machine
-from machineattribute import MachineAttribute
-from machinedetails import MachineDetails
-from machinetestresults import MachineTestResults
+from Models.cloud import Cloud
+from Models.ossupport import OSSupport
+from Models.test import Test
+from Models.machine import Machine
+from Models.machineattribute import MachineAttribute
+from Models.machinedetail import MachineDetail
+from Models.machinetestresult import MachineTestResult
+
+from Models.InitDB import init_database
 
 import datetime
 
 
 class DataProviderService:
-    def __init__(self, nr_of_items):
-        self.CLOUDS = None
-        self.OSSUPPORTS = None
-        self.MACHINES = None
-        self.MACHINEATTRIBUTES = None
-        self.TESTS = None
+    def __init__(self, engine):
+        """
+        :param engine: The engine route and login details
+        :return: a new instance of DataProviderService class
+        :type engine: string
+        """
+        if not engine:
+            raise ValueError('The values specified in engine parameter has to be supported by SQLAlchemy')
+        self.engine = engine
+        db_engine = create_engine(engine)
+        db_session = sessionmaker(bind=db_engine)
+        self.session = db_session()
 
-        self.MACHINEDETAILS = None
-        self.MACHINETESTRESULTS = None
-
-        self.cloud_data_generator = CloudDataGenerator()
-        self.MACHINEDETAILS = self.cloud_data_generator.generate_machinedetails()
-        self.MACHINETESTRESULTS = self.cloud_data_generator.generate_machinetestresults()
-
-        self.CLOUDS = self.cloud_data_generator.generate_clouds()
-        self.OSSUPPORTS = self.cloud_data_generator.generate_ossupports()
-        self.MACHINES = self.cloud_data_generator.generate_machines()
-        self.MACHINEATTRIBUTES = self.cloud_data_generator.generate_machineattributes()
-        self.TESTS = self.cloud_data_generator.generate_tests()
-
-        # self.data_generator = DataGenerator()
-        # self.CANDIDATES = self.data_generator.generate_candidates(nr_of_items)
+    def init_database(self):
+        """
+        Initializes the database tables and relationships
+        :return: None
+        """
+        init_database(self.engine)
 
     # Cloud functions
-    def get_clouds(self):
-        return self.CLOUDS
-
-    def get_cloud(self, id):
-        result = None
-        if id and self.CLOUDS:
-            for c in self.CLOUDS:
-                if id == str(c.id):
-                    result = c
-                    break
-        return result
-
-    def get_cloud_by_name(self,name):
-        result = None
-        if name and self.CLOUDS:
-            for m in self.CLOUDS:
-                if name == str(m.name):
-                    result = m
-                    break
-        return result
 
     def add_cloud(self, name):
-        c = Cloud(name)
-        if self.CLOUDS == None:
-            self.CLOUDS = []
-        self.CLOUDS.append(c)
-        return str(c.id)
+        """
+        Creates and saves a new cloud to the database.
 
-    def ossupports_by_cloudid(self,id):
-        result = None
-        if self.get_cloud(id) == None:
-            return result
-        result = []
-        if id and self.OSSUPPORTS:
-            for c in self.OSSUPPORTS:
-                if id == str(c.cloud.id):
-                    result.append(c)
-        return result
-    def machines_by_cloudid(self,id):
-        result = None
-        if self.get_cloud(id) == None:
-            return result
-        result = []
-        for m in self.MACHINES:
-            if id == str(m.ossupport.cloud.id):
-                result.append(m)
-        return result
+        :param name: Name of the cloud
+        :return: The id of the new Candidate
+        """
+
+        new_cloud = Cloud(name=name)
+
+        self.session.add(new_cloud)
+        self.session.commit()
+
+        return new_cloud.id
+
+    def get_cloud(self, id=None, name=None, serialize=False):
+        """
+        If the id parameter is  defined then it looks up the cloud with the given id,
+        otherwise it loads all the clouds
+
+        :param id: The id of the cloud which needs to be loaded (default value is None)
+        :return: The cloud or clouds.
+        """
+
+        all_clouds = []
+
+        if id:
+            all_clouds = self.session.query(Cloud).filter(Cloud.id == id).all()
+        elif name:
+            all_clouds = self.session.query(Cloud).filter(Cloud.name == name).all()
+        else:
+            all_clouds = self.session.query(Cloud).order_by(Cloud.name).all()
+
+        if serialize:
+            return [cand.serialize() for cand in all_clouds]
+        else:
+            return all_clouds
+
     # ossupport functions
-    def get_ossupports(self):
-        return self.OSSUPPORTS
+    def get_ossupport(self, id=None, name=None, cloud_id=None, serialize=False):
+        """
+        If the id parameter is  defined then it looks up the ossupport with the given id,
+        otherwise it loads all the ossupports
 
-    def get_ossupport(self, id):
-        result = None
-        if id and self.OSSUPPORTS:
-            for c in self.OSSUPPORTS:
-                if id == str(c.id):
-                    result = c
-                    break
-        return result
+        :param id: The id of the ossupports which needs to be loaded (default value is None)
+        :return: The ossupport or ossupports.
+        """
 
-    def get_ossupport_by_name(self,name):
-        result = None
-        if name and self.OSSUPPORTS:
-            for m in self.OSSUPPORTS:
-                if name == str(m.name):
-                    result = m
-                    break
-        return result
+        all_ossupoorts = []
 
-    def add_ossupport(self, name):
-        c = OSSupport(name)
-        if self.OSSUPPORTS == None:
-            self.OSSUPPORTS = []
-        self.OSSUPPORTS.append(c)
-        return str(c.id)
+        if id:
+            all_ossupoorts = self.session.query(OSSupport).filter(OSSupport.id == id).all()
+        elif name:
+            all_ossupoorts = self.session.query(OSSupport).filter(OSSupport.name == name).all()
+        elif cloud_id:
+            all_ossupoorts = self.session.query(OSSupport).filter(OSSupport.cloud == cloud_id).all()
+        else:
+            all_ossupoorts = self.session.query(OSSupport).order_by(OSSupport.name).all()
+
+        if serialize:
+            return [cand.serialize() for cand in all_ossupoorts]
+        else:
+            return all_ossupoorts
+
+    def add_ossupport(self, name, version,cloud_id):
+        """
+        Creates and saves a new ossupport to the database.
+
+        :param name: Name of the ossupport
+        :return: The id of the new OSSupport
+        """
+
+        new_ossupport = OSSupport(name=name,version=version,cloud=int(cloud_id))
+
+        self.session.add(new_ossupport)
+        self.session.commit()
+
+        return new_ossupport.id
     # test functions
-    def get_tests(self):
-        return self.TESTS
+    def get_test(self,id=None,name=None,serialize=False):
+        """
+        If the id parameter is  defined then it looks up the test with the given id,
+        otherwise it loads all the tests
 
-    def get_test(self, id):
-        result = None
-        if id and self.TESTS:
-            for c in self.TESTS:
-                if id == str(c.id):
-                    result = c
-                    break
-        return result
+        :param id: The id of the tests which needs to be loaded (default value is None)
+        :return: The test or tests.
+        """
 
-    def get_test_by_name(self,name):
-        result = None
-        if name and self.TESTS:
-            for m in self.TESTS:
-                if name == str(m.name):
-                    result = m
-                    break
-        return result
+        all_tests = []
+
+        if id:
+            all_tests = self.session.query(Test).filter(Test.id == id).all()
+        elif name:
+            all_tests = self.session.query(Test).filter(Test.name == name).all()
+        else:
+            all_tests = self.session.query(Test).order_by(Test.name).all()
+
+        if serialize:
+            return [cand.serialize() for cand in all_tests]
+        else:
+            return all_tests
 
     def add_test(self, name):
-        c = Test(name)
-        if self.TESTS == None:
-            self.TESTS = []
-        self.TESTS.append(c)
-        return str(c.id)
+        """
+        Creates and saves a new test to the database.
+
+        :param name: Name of the test
+        :return: The id of the new test
+        """
+
+        new_test = Test(name=name)
+
+        self.session.add(new_test)
+        self.session.commit()
+
+        return new_test.id
     # Machine functions
-    def get_machines(self):
-        return self.MACHINES
+    def get_machine(self, id=None,name=None,ossupport_id=None,cloud_id=None,serialize=False):
+        """
+        If the id parameter is  defined then it looks up the machine with the given id,
+        otherwise it loads all the machies
 
-    def get_machine(self, id):
-        result = None
-        if id and self.MACHINES:
-            for m in self.MACHINES:
-                if id == str(m.id):
-                    result = m
-                    break
-        return result
-    def get_machine_by_name(self,name):
-        result = None
-        if name and self.MACHINES:
-            for m in self.MACHINES:
-                if name == str(m.name):
-                    result = m
-                    break
-        return result
+        :param id: The id of the machine which needs to be loaded (default value is None)
+        :return: The machine or machines.
+        """
 
-    def add_machine(self, name, version, status, released_date):
-        m = Machine(name, version, status, released_date)
-        if self.MACHINES == None:
-            self.MACHINES = []
-        self.MACHINES.append(m)
-        return str(m.id)
-    def machinetestresults_by_machineid(self,id):
-        result = None
-        if self.get_machine(id) == None:
-            return result
-        result = []
-        for m in self.MACHINETESTRESULTS:
-            if id == str(m.machine.id):
-                result.append(m)
-        return result
-    def machinedetails_by_machineid(self,id):
-        result = None
-        if self.get_machine(id) == None:
-            return result
-        result = []
-        for m in self.MACHINEDETAILS:
-            if id == str(m.machine.id):
-                result.append(m)
-        return result
+        all_machines = []
+        if id == None and name == None and ossupport_id == None and cloud_id:
+            all_ossupoorts = self.get_ossupport(cloud_id=cloud_id)
+        if id:
+            all_machines = self.session.query(Machine).filter(Machine.id == id).all()
+        elif name:
+            all_machines = self.session.query(Machine).filter(Machine.name == name).all()
+        elif ossupport_id:
+            all_machines = self.session.query(Machine).filter(Machine.ossupport == ossupport_id).all()
+        elif cloud_id:
+            for s in all_ossupoorts:
+                all_machines += self.session.query(Machine).filter(Machine.ossupport == s.id).all()
+        else:
+            all_machines = self.session.query(Machine).order_by(Machine.name).all()
+        if serialize:
+            return [cand.serialize() for cand in all_machines]
+        else:
+            return all_machines
+
+    def add_machine(self, name, version, status, released_date, ossupport_id):
+        """
+        Creates and saves a new machine to the database.
+
+        :param name: Name of the machine
+        :return: The id of the new machine
+        """
+        released_date = datetime.datetime.strptime(released_date, '%d-%m-%Y')
+        new_machine = Machine(name=name,version=version,status=status,
+                        released_date=released_date,ossupport=int(ossupport_id))
+
+        self.session.add(new_machine)
+        self.session.commit()
+        return new_machine.id
+
     # MachineAttributes functions
-    def get_machineattributes(self):
-        return self.MACHINEATTRIBUTES
+    def get_machineattribute(self,id=None,name=None,serialize=False):
+        """
+        If the id parameter is  defined then it looks up the machine with the given id,
+        otherwise it loads all the machies
 
-    def get_machineattribute(self, id):
-        result = None
-        if id and self.MACHINEATTRIBUTES:
-            for m in self.MACHINEATTRIBUTES:
-                if id == str(m.id):
-                    result = m
-                    break
-        return result
-    def get_machineattribute_by_name(self,name):
-        result = None
-        if name and self.MACHINEATTRIBUTES:
-            for m in self.MACHINEATTRIBUTES:
-                if name == str(m.name):
-                    result = m
-                    break
-        return result
+        :param id: The id of the machine which needs to be loaded (default value is None)
+        :return: The machine or machines.
+        """
+
+        all_machineattributes = []
+
+        if id:
+            all_machineattributes = self.session.query(MachineAttribute).filter(MachineAttribute.id == id).all()
+        elif name:
+            all_machineattributes = self.session.query(MachineAttribute).filter(MachineAttribute.name == name).all()
+        else:
+            all_machineattributes = self.session.query(MachineAttribute).order_by(MachineAttribute.name).all()
+
+        if serialize:
+            return [cand.serialize() for cand in all_machineattributes]
+        else:
+            return all_machineattributes
 
     def add_machineattribute(self, name):
-        m = MachineAttribute(name)
-        if self.MACHINEATTRIBUTES == None:
-            self.MACHINEATTRIBUTES = []
-        self.MACHINEATTRIBUTES.append(m)
-        return str(m.id)
+        """
+        Creates and saves a new new_machineattribute to the database.
+
+        :param name: Name of the new_machineattribute
+        :return: The id of the new new_machineattribute
+        """
+
+        new_machineattribute = MachineAttribute(name=name)
+
+        self.session.add(new_machineattribute)
+        self.session.commit()
+        return new_machineattribute.id
+
     # MachineDetails functions
-    def get_machinedetails(self):
-        return self.MACHINEDETAILS
+    def get_machinedetail(self,id=None,machine_id=None,serialize=False):
+        """
+        If the id parameter is  defined then it looks up the machine with the given id,
+        otherwise it loads all the machinedetails
 
-    def get_machinedetail(self, id):
-        result = None
-        if id and self.MACHINEDETAILS:
-            for m in self.MACHINEDETAILS:
-                if id == str(m.id):
-                    result = m
-                    break
-        return result
+        If the machine_id parameter is  defined then it looks up the machine with the given
+        machine_id, otherwise it loads all the machinedetails
 
-    def add_machinedetail(self, value, attribute, machine):
-        m = MachineDetails( value,attribute, machine)
-        if self.MACHINEDETAILS == None:
-            self.MACHINEDETAILS = []
-        self.MACHINEDETAILS.append(m)
-        return str(m.id)
+        :param id: The id of the machine which needs to be loaded (default value is None)
+        :return: The machinedetail or machinedetails.
+        """
+
+        all_machindetails = []
+
+        if id:
+            all_machindetails = self.session.query(MachineDetail).filter(MachineDetail.id == id).all()
+        elif machine_id:
+            all_machindetails = self.session.query(MachineDetail).filter(MachineDetail.machine == machine_id).all()
+        else:
+            all_machindetails = self.session.query(MachineDetail).order_by(MachineDetail.value).all()
+
+        if serialize:
+            return [cand.serialize() for cand in all_machindetails]
+        else:
+            return all_machindetails
+
+    def add_machinedetail(self, value, attribute_id, machine_id):
+        """
+        Creates and saves a new new_machinedetail to the database.
+
+        :param value: Value of the new_machinedetail
+        :param attribute_id: Attribute id of the new_machinedetail
+        :param machine_id: Machine id of the new_machinedetail
+        :return: The id of the new new_machinedetail
+        """
+
+        new_machinedetail = MachineDetail(value=value,attribute=attribute_id,machine=machine_id)
+
+        self.session.add(new_machinedetail)
+        self.session.commit()
+        return new_machinedetail.id
 
     # MachineTestResults functions
-    def get_machinetestresults(self):
-        return self.MACHINETESTRESULTS
+    def get_machinetestresult(self,id=None,machine_id=None,serialize=False):
+        """
+        If the id parameter is  defined then it looks up the machine with the given id,
+        otherwise it loads all the machinedetails
 
-    def get_machinetestresult(self, id):
-        result = None
-        if id and self.MACHINETESTRESULTS:
-            for m in self.MACHINETESTRESULTS:
-                if id == str(m.id):
-                    result = m
-                    break
-        return result
+        :param id: The id of the machine which needs to be loaded (default value is None)
+        :return: The machinedetail or machinedetails.
+        """
 
-    def add_machinetestresult(self, test, status, machine):
-        m = MachineTestResults( test, status, machine)
-        if self.MACHINETESTRESULTS == None:
-            self.MACHINETESTRESULTS = []
-        self.MACHINETESTRESULTS.append(m)
-        return str(m.id)
+        all_machinetestresults = []
+
+        if id:
+            all_machinetestresults = self.session.query(MachineTestResult).filter(MachineTestResult.id == id).all()
+        elif machine_id:
+            all_machinetestresults = self.session.query(MachineTestResult).filter(MachineTestResult.machine == machine_id).all()
+        else:
+            all_machinetestresults = self.session.query(MachineTestResult).order_by(MachineTestResult.status).all()
+
+        if serialize:
+            return [cand.serialize() for cand in all_machinetestresults]
+        else:
+            return all_machinetestresults
+
+    def add_machinetestresult(self, status, machine_id, test_id):
+        """
+        Creates and saves a new new_machinetestresult to the database.
+
+        :param status: Status of the new_machinetestresult
+        :param test_id: Test id of the new_machinetestresult
+        :param machine_id: Machine id of the new_machinetestresult
+        :return: The id of the new new_machinetestresult
+        """
+
+        new_machinetestresult = MachineTestResult(test=int(test_id),
+                                                    status=status,machine=int(machine_id))
+
+        self.session.add(new_machinetestresult)
+        self.session.commit()
+        return new_machinetestresult.id
 
     def machinetestresult_update_status(self, id, new_status):
         nr_of_updated_items = 0
@@ -273,58 +342,3 @@ class DataProviderService:
             return True
         else:
             return False
-
-    # Rest of the code
-    def get_candidates(self):
-        return self.CANDIDATES
-
-    def get_candidate(self, id):
-        result = None
-        if id:
-            for cand in self.CANDIDATES:
-                if id == str(cand["id"]):
-                    result = cand
-                    break
-        return result
-
-    def get_random_candidates(self, nr_of_candidates):
-        return self.data_generator.generate_candidates(nr_of_candidates)
-
-    def update_name(self, id, new_name):
-        nr_of_updated_items = 0
-
-        for cand in self.CANDIDATES:
-            if id == str(cand["id"]):
-                cand["first_name"] = new_name
-                nr_of_updated_items += 1
-                break
-
-        return nr_of_updated_items
-
-    def delete_candidate(self, id):
-        cand_for_delete = None
-        for cand in self.CANDIDATES:
-            if id == str(cand["id"]):
-                cand_for_delete = cand
-                break
-
-        if cand_for_delete is not None:
-            self.CANDIDATES.remove(cand_for_delete)
-            return True
-        else:
-            return False
-
-    def add_candidate(self, first_name, last_name):
-        cand = Candidate(first_name, last_name, [])
-        self.CANDIDATES.append(cand.serialize())
-        return str(cand.id)
-
-    def add_project(self, project_name, project_description):
-        new_project = Project(project_name, datetime.datetime.utcnow(), datetime.datetime.utcnow(), project_description)
-
-        self.CANDIDATES[0]['experience'][0]['projects'].append(new_project.serialize())
-        return str(new_project.id)
-
-
-    def get_random_projects(self, nr_of_projects):
-        return self.data_generator.generate_projects(nr_of_projects, True)
